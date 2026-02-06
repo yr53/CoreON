@@ -108,3 +108,42 @@ CREATE TABLE IF NOT EXISTS board_post (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=UTF8MB4;
 
+```
+faq 테이블
+```
+
+CREATE TABLE faq (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  category VARCHAR(100) NOT NULL,
+  question_title VARCHAR(255) NOT NULL,
+  answer TEXT NOT NULL,
+  tags_json JSON NULL,
+  owner_team VARCHAR(100) NOT NULL DEFAULT 'IT운영팀',
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  embedding_json LONGTEXT NULL,
+  embedding_model VARCHAR(64) NULL,
+  embedded_at DATETIME NULL,
+
+  PRIMARY KEY (id),
+  INDEX idx_faq_category (category),
+  INDEX idx_faq_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+```
+faq_chat_message 테이블
+```
+
+CREATE TABLE faq_chat_message (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id VARCHAR(50) NOT NULL,
+  role VARCHAR(10) NOT NULL,      
+  content TEXT NOT NULL,
+  faq_id BIGINT NULL,             
+  score DOUBLE NULL,              
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_user_created (user_id, created_at),
+  INDEX idx_user_id (user_id, id)
+);
