@@ -68,45 +68,45 @@ ENGINE=InnoDB
 
 board_attachment 테이블
 ```
-CREATE TABLE IF NOT EXISTS board_attachment (
-  attachment_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  board_id BIGINT NOT NULL,
-
-  original_name VARCHAR(255) NOT NULL,
-  stored_url VARCHAR(500) NOT NULL,
-
-  content_type VARCHAR(100) NULL,
-  size_bytes BIGINT NULL,
-
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  KEY idx_board_id (board_id),
-  CONSTRAINT fk_attachment_board
-    FOREIGN KEY (board_id) REFERENCES board_post(board_id)
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE `board_attachment` (
+	`attachment_id` BIGINT(20) NOT NULL AUTO_INCREMENT,
+	`board_id` BIGINT(20) NOT NULL,
+	`original_name` VARCHAR(255) NOT NULL COLLATE 'utf8mb4_general_ci',
+	`stored_url` VARCHAR(500) NOT NULL COLLATE 'utf8mb4_general_ci',
+	`content_type` VARCHAR(100) NULL DEFAULT NULL COLLATE 'utf8mb4_general_ci',
+	`size_bytes` BIGINT(20) NULL DEFAULT NULL,
+	`created_at` DATETIME NOT NULL DEFAULT current_timestamp(),
+	PRIMARY KEY (`attachment_id`) USING BTREE,
+	INDEX `idx_board_id` (`board_id`) USING BTREE,
+	CONSTRAINT `fk_attachment_board` FOREIGN KEY (`board_id`) REFERENCES `board_post` (`board_id`) ON UPDATE RESTRICT ON DELETE CASCADE
+)
+COLLATE='utf8mb4_general_ci'
+ENGINE=InnoDB
+AUTO_INCREMENT=6
+;
 
 ```
 board_post 테이블
 ```
 
-CREATE TABLE IF NOT EXISTS board_post (
-  board_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE `board_post` (
+	`board_id` BIGINT(20) NOT NULL AUTO_INCREMENT,
+	`category` VARCHAR(50) NOT NULL COLLATE 'utf8mb4_general_ci',
+	`title` VARCHAR(200) NOT NULL COLLATE 'utf8mb4_general_ci',
+	`content` TEXT NULL DEFAULT NULL COLLATE 'utf8mb4_general_ci',
+	`dept` VARCHAR(100) NULL DEFAULT NULL COLLATE 'utf8mb4_general_ci',
+	`author_id` VARCHAR(50) NOT NULL COLLATE 'utf8mb4_general_ci',
+	`author_name` VARCHAR(100) NOT NULL COLLATE 'utf8mb4_general_ci',
+	`view_count` BIGINT(20) NOT NULL DEFAULT '0',
+	`created_at` DATETIME NOT NULL DEFAULT current_timestamp(),
+	`updated_at` DATETIME NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+	PRIMARY KEY (`board_id`) USING BTREE
+)
+COLLATE='utf8mb4_general_ci'
+ENGINE=InnoDB
+AUTO_INCREMENT=9
+;
 
-  category VARCHAR(50) NOT NULL,
-  title VARCHAR(200) NOT NULL,
-  content TEXT NULL,
-
-  dept VARCHAR(100) NULL,
-
-  author_employee_no BIGINT NOT NULL,
-  author_name VARCHAR(100) NOT NULL,
-
-  view_count BIGINT NOT NULL DEFAULT 0,
-
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=UTF8MB4;
 
 ```
 faq 테이블
