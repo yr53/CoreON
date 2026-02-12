@@ -2,12 +2,13 @@ name: CD - Deploy ECS (taskdef image -> github.sha)
 
 on:
   workflow_run:
-    workflows: ["CI - Build & Push to ECR"]  
+    workflows: ["CI - Build & Push to ECR"]
     types: [completed]
 
 permissions:
-  id-token: write
   contents: read
+  # Access Key 방식이면 id-token 필요 없음(있어도 문제는 없음)
+  # id-token: write
 
 env:
   AWS_REGION: ap-northeast-2
@@ -16,12 +17,13 @@ env:
 
 jobs:
   deploy:
+    name: Deploy ECS services (by matrix)
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
-      max-parallel: 1  # ✅ 안전하게 순차 배포 (원하면 8로 병렬 가능)
+      max-parallel: 1
       matrix:
         include:
           - app: nginx
@@ -34,11 +36,22 @@ jobs:
           - app: notice
 
     steps:
-      - name: Configure AWS credentials (OIDC)
+      # (선택) 작업 로그에 sha 확인용
+      - name: Print CI SHA
+        run: |
+          echo "Triggered by CI workflow_run"
+          echo "head_sha = ${{ github.event.workflow_run.head_sha }}"
+
+      - name: Configure AWS credentials (Access Key)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
+      # (선택) AWS 인증이 제대로 되었는지 1초 검증
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
 
       - name: Deploy ${{ matrix.app }} (replace taskdef image to SHA)
         shell: bash
@@ -55,9 +68,10 @@ jobs:
           echo "==> Deploying APP=${APP}"
           echo "    Cluster : ${ECS_CLUSTER}"
           echo "    Service : ${SERVICE_NAME}"
+          echo "    Container: ${CONTAINER_NAME}"
           echo "    Image   : ${IMAGE_URI}"
 
-          # 1) 현재 서비스가 사용 중인 task definition ARN 조회
+          # 1) 현재 서비스의 task definition ARN 조회
           TD_ARN=$(aws ecs describe-services \
             --cluster "${ECS_CLUSTER}" \
             --services "${SERVICE_NAME}" \
@@ -77,7 +91,7 @@ jobs:
             --query "taskDefinition" \
             --output json > td.json
 
-          # 3) register-task-definition에 불필요한 필드 제거 + 특정 컨테이너의 image만 교체
+          # 3) 불필요한 필드 제거 + 해당 컨테이너의 image만 교체
           jq --arg IMAGE "$IMAGE_URI" --arg CNAME "$CONTAINER_NAME" '
             del(
               .taskDefinitionArn,
@@ -100,6 +114,8 @@ jobs:
             echo "ERROR: container name mismatch or image not updated."
             echo "       Expected container name: ${CONTAINER_NAME}"
             echo "       Check Terraform container name and matrix.app value."
+            echo "       Dump container names:"
+            jq -r '.containerDefinitions[].name' td-new.json
             exit 1
           fi
 
@@ -118,6 +134,4 @@ jobs:
             --task-definition "${NEW_TD_ARN}" \
             --force-new-deployment >/dev/null
 
-          echo "✅ Update triggered for ${SERVICE_NAME}"
-
-
+          echo "Update triggered for ${SERVICE_NAME}"
