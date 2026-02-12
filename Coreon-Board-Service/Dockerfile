@@ -1,3 +1,4 @@
+#ci trigger
 # 1단계: Maven 빌드
 #FROM eclipse-temurin:17-jdk-jammy AS builder
 #WORKDIR /build
