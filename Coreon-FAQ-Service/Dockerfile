@@ -11,7 +11,7 @@ FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
 # 빌드된 jar 복사
-COPY --from=builder /build/target/*.jar app.jar
+COPY --from=builder /build/target/*-SNAPSHOT.jar /app/app.jar
 
 # (선택) 외부에서 JAVA_OPTS 주입 가능하게
 ENV JAVA_OPTS=""
