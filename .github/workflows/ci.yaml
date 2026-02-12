@@ -40,10 +40,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set repo name (lowercase)
+      - name: Set ECR repo name (lowercase)
+        shell: bash
         run: |
-          echo "ECR_REPO=$(echo '${{ matrix.service }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-
+          repo="$(echo '${{ matrix.service }}' | tr '[:upper:]' '[:lower:]')"
+          echo "ECR_REPO=$repo" >> "$GITHUB_ENV"
+          echo "ECR_REPO=$repo"
+          
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
