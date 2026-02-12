@@ -9,13 +9,14 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.filter.outputs.changes }}
+      matrix: ${{ steps.filter.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: dorny/paths-filter@v3
         id: filter
         with:
+          list-files: none
           filters: |
             board:
               - 'Coreon-Board-Service/**'
@@ -28,6 +29,33 @@ jobs:
             notice:
               - 'Coreon_NoticeService/**'
 
+      - name: Build matrix JSON
+        id: matrix
+        shell: bash
+        run: |
+          # paths-filter outputs like: {"board":true,"faq":false,...}
+          # We want: [{"key":"board","path":"Coreon-Board-Service"}, ...]
+          json='[]'
+
+          if [ "${{ steps.filter.outputs.board }}" = "true" ]; then
+            json=$(echo "$json" | jq '. + [{"key":"board","path":"Coreon-Board-Service"}]')
+          fi
+          if [ "${{ steps.filter.outputs.faq }}" = "true" ]; then
+            json=$(echo "$json" | jq '. + [{"key":"faq","path":"Coreon-FAQ-Service"}]')
+          fi
+          if [ "${{ steps.filter.outputs.auth }}" = "true" ]; then
+            json=$(echo "$json" | jq '. + [{"key":"auth","path":"Coreon_AuthService"}]')
+          fi
+          if [ "${{ steps.filter.outputs.member }}" = "true" ]; then
+            json=$(echo "$json" | jq '. + [{"key":"member","path":"Coreon_MemberService"}]')
+          fi
+          if [ "${{ steps.filter.outputs.notice }}" = "true" ]; then
+            json=$(echo "$json" | jq '. + [{"key":"notice","path":"Coreon_NoticeService"}]')
+          fi
+
+          echo "matrix=$json" >> "$GITHUB_OUTPUT"
+          echo "matrix=$json"
+
   build-and-push:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.matrix != '[]' }}
@@ -36,16 +64,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: ${{ fromJSON(needs.detect-changes.outputs.matrix) }}
+        include: ${{ fromJSON(needs.detect-changes.outputs.matrix) }}
 
     steps:
       - uses: actions/checkout@v4
 
-      # 🔥 Terraform과 동일한 ECR repo 이름 강제
-      - name: Set ECR repo name
+      - name: Set ECR repo name (matches Terraform)
+        shell: bash
         run: |
-          echo "ECR_REPO=coreon-${{ matrix.service }}" >> "$GITHUB_ENV"
-          echo "ECR_REPO=coreon-${{ matrix.service }}"
+          echo "ECR_REPO=coreon-${{ matrix.key }}" >> "$GITHUB_ENV"
+          echo "ECR_REPO=coreon-${{ matrix.key }}"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -64,8 +92,8 @@ jobs:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         with:
-          context: ./Coreon-${{ matrix.service | upper }}-Service
-          file: ./Coreon-${{ matrix.service | upper }}-Service/Dockerfile
+          context: ./${{ matrix.path }}
+          file: ./${{ matrix.path }}/Dockerfile
           push: true
           tags: |
             ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}
