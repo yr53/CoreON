@@ -1,0 +1,123 @@
+name: CD - Deploy ECS (taskdef image -> github.sha)
+
+on:
+  workflow_run:
+    workflows: ["CI - Build & Push to ECR"]  
+    types: [completed]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECS_CLUSTER: coreon-intranet-cluster
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-2.amazonaws.com
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      max-parallel: 1  # ✅ 안전하게 순차 배포 (원하면 8로 병렬 가능)
+      matrix:
+        include:
+          - app: nginx
+          - app: redis
+          - app: front
+          - app: auth
+          - app: member
+          - app: faq
+          - app: board
+          - app: notice
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy ${{ matrix.app }} (replace taskdef image to SHA)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP="${{ matrix.app }}"
+          SERVICE_NAME="${APP}-service"
+          CONTAINER_NAME="${APP}"
+
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          IMAGE_URI="${ECR_REGISTRY}/coreon-${APP}:${SHA}"
+
+          echo "==> Deploying APP=${APP}"
+          echo "    Cluster : ${ECS_CLUSTER}"
+          echo "    Service : ${SERVICE_NAME}"
+          echo "    Image   : ${IMAGE_URI}"
+
+          # 1) 현재 서비스가 사용 중인 task definition ARN 조회
+          TD_ARN=$(aws ecs describe-services \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${SERVICE_NAME}" \
+            --query "services[0].taskDefinition" \
+            --output text)
+
+          if [[ -z "${TD_ARN}" || "${TD_ARN}" == "None" ]]; then
+            echo "ERROR: Could not resolve taskDefinition for service ${SERVICE_NAME}"
+            exit 1
+          fi
+
+          echo "    Current TD: ${TD_ARN}"
+
+          # 2) task definition JSON 가져오기
+          aws ecs describe-task-definition \
+            --task-definition "${TD_ARN}" \
+            --query "taskDefinition" \
+            --output json > td.json
+
+          # 3) register-task-definition에 불필요한 필드 제거 + 특정 컨테이너의 image만 교체
+          jq --arg IMAGE "$IMAGE_URI" --arg CNAME "$CONTAINER_NAME" '
+            del(
+              .taskDefinitionArn,
+              .revision,
+              .status,
+              .requiresAttributes,
+              .compatibilities,
+              .registeredAt,
+              .registeredBy
+            )
+            | .containerDefinitions = (
+                .containerDefinitions
+                | map(if .name == $CNAME then .image = $IMAGE else . end)
+              )
+          ' td.json > td-new.json
+
+          # sanity check: 컨테이너명이 일치하지 않으면 이미지가 안 바뀜 → 방지
+          if ! jq -e --arg CNAME "$CONTAINER_NAME" --arg IMAGE "$IMAGE_URI" \
+            '.containerDefinitions[] | select(.name==$CNAME) | .image==$IMAGE' td-new.json >/dev/null; then
+            echo "ERROR: container name mismatch or image not updated."
+            echo "       Expected container name: ${CONTAINER_NAME}"
+            echo "       Check Terraform container name and matrix.app value."
+            exit 1
+          fi
+
+          # 4) 새 task definition revision 등록
+          NEW_TD_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://td-new.json \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+
+          echo "    New TD: ${NEW_TD_ARN}"
+
+          # 5) 서비스 업데이트 (롤링 배포)
+          aws ecs update-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service "${SERVICE_NAME}" \
+            --task-definition "${NEW_TD_ARN}" \
+            --force-new-deployment >/dev/null
+
+          echo "✅ Update triggered for ${SERVICE_NAME}"
+
+
