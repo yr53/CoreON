@@ -27,6 +27,8 @@ jobs:
               - 'Coreon_MemberService/**'
             Coreon_NoticeService:
               - 'Coreon_NoticeService/**'
+            Coreon-nginx-gateway:
+              - 'Coreon-nginx-gateway/**'
 
   build-and-push:
     needs: detect-changes
@@ -51,6 +53,7 @@ jobs:
             "Coreon_AuthService")    repo="coreon-auth" ;;
             "Coreon_MemberService")  repo="coreon-member" ;;
             "Coreon_NoticeService")  repo="coreon-notice" ;;
+             "Coreon-nginx-gateway")  repo="coreon-nginx" ;;
             *)
               echo "Unknown service folder: ${{ matrix.service }}"
               exit 1
