@@ -1,0 +1,21 @@
+# Maven / Gradle build outputs
+**/target/
+**/build/
+
+# IntelliJ / Eclipse
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.factorypath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Terraform (혹시 terraform도 같이 있으면)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
