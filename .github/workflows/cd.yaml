@@ -27,8 +27,6 @@ jobs:
       matrix:
         include:
           - app: nginx
-          - app: redis
-          - app: front
           - app: auth
           - app: member
           - app: faq
