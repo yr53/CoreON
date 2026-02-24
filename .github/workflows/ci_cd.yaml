@@ -39,8 +39,8 @@ jobs:
               - 'Coreon_NoticeService/**'
             front:
               - 'Coreon-Front/**'
-            #redis:
-              #- 'Coreon-Redis/**'
+            redis:
+              - 'Coreon-Redis/**'
 
   build-and-push:
     needs: detect-changes
@@ -65,7 +65,7 @@ jobs:
             member) folder="Coreon_MemberService" ;;
             notice) folder="Coreon_NoticeService" ;;
             front)  folder="Coreon-Front" ;;
-            #redis)  folder="Coreon-Redis" ;;
+            redis)  folder="Coreon-Redis" ;;
             *)
               echo "Unknown app: ${{ matrix.app }}"
               exit 1
@@ -139,7 +139,7 @@ jobs:
             faq)    SERVICE_NAME="contents-service" ;;
             board)  SERVICE_NAME="contents-service" ;;
             notice) SERVICE_NAME="contents-service" ;;
-           # redis)  SERVICE_NAME="redis-service" ;;
+            redis)  SERVICE_NAME="redis-service" ;;
             *)
               echo "ERROR: Unknown APP(container) = $APP"
               exit 1
